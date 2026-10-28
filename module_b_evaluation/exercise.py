@@ -57,8 +57,13 @@ ensure_exercise_dataset()
 # ---------------------------------------------------------------------------
 def run_agent(inputs):
     question = inputs["question"]
-    # YOUR CODE HERE
-    pass
+    result = ask(app, question)
+    return {
+            "answer": result["response"],
+            "intent": result["intent"],
+            "context": result["context"],
+            "retrieved_sources": result["retrieved_sources"],
+        }
 
 
 # ---------------------------------------------------------------------------
@@ -69,8 +74,10 @@ def run_agent(inputs):
 # Return: {"key": "routing_accuracy", "score": float}
 # ---------------------------------------------------------------------------
 def routing_evaluator(run, example):
-    # YOUR CODE HERE
-    pass
+    predicted = run.outputs.get("intent", "")
+    expected = example.outputs.get("intent", "")
+    score = 1.0 if predicted == expected else 0.0
+    return {"key": "routing_accuracy", "score": score}
 
 
 # ---------------------------------------------------------------------------
@@ -89,10 +96,37 @@ def faithfulness_evaluator(run, example):
     answer = run.outputs.get("answer", "")
     context = run.outputs.get("context", "")
     question = example.inputs.get("question", "")
-
-    # YOUR CODE HERE — build prompt, call judge_llm, parse JSON, return score
-    pass
-
+    FAITHFULNESS_PROMPT = ChatPromptTemplate.from_messages([
+    ("system",
+     "You are an expert evaluator. Assess whether the answer is faithful "
+     "to the provided context.\n\n"
+     "Score 1.0 = fully faithful: every claim is supported by the context\n"
+     "Score 0.5 = partially faithful: some claims are unsupported\n"
+     "Score 0.0 = not faithful: contains claims contradicting or absent from context\n\n"
+     "If the context is empty (escalation response), score 1.0 if the response "
+     "is a general empathetic handoff without specific policy claims, else 0.5.\n\n"
+     'Respond ONLY with JSON: {{"score": <float>, "reason": "<one sentence>"}}'),
+    ("human",
+     "Context:\n{context}\n\nQuestion: {question}\n\nAnswer to evaluate:\n{answer}"),
+])
+    if not answer:
+            return {"key": "faithfulness", "score": 0.0}
+    
+    messages = FAITHFULNESS_PROMPT.format_messages(
+        context=context[:2000] if context else "(no context — escalation response)",
+        question=question,
+        answer=answer,
+    )
+    response = judge_llm.invoke(messages).content.strip()
+    
+    try:
+        start, end = response.find("{"), response.rfind("}") + 1
+        parsed = json.loads(response[start:end])
+        score = float(parsed.get("score", 0.5))
+        reason = parsed.get("reason", "")
+        return {"key": "faithfulness", "score": score, "comment": reason}
+    except (json.JSONDecodeError, ValueError):
+        return {"key": "faithfulness", "score": 0.5}
 
 # ---------------------------------------------------------------------------
 # TODO 4: Implement LLM-as-judge correctness evaluator

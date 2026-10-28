@@ -44,8 +44,8 @@ from fintech_support_agent import build_support_agent, ask
 # Use build_support_agent() with collection_name="observability_exercise"
 # ---------------------------------------------------------------------------
 # YOUR CODE HERE
-agent = None
-app = None
+agent = build_support_agent(collection_name="observability_exercise", chunk_size=200, chunk_overlap=20)
+app = agent["app"]
 
 # ---------------------------------------------------------------------------
 # TODO 3: Run 3 different queries — one for each agent type
@@ -71,7 +71,10 @@ if app is not None:
     for query in queries:
         print(f"\nQuery: {query}")
         # YOUR CODE HERE — run the query and print results
-        pass
+        result = ask(app, query)
+        print(f"Intent:   {result['intent']}")
+        print(f"Answer:   {result['response'][:200]}")
+        print(f"Sources:  {result['retrieved_sources']}")
 else:
     print("Complete TODO 2 first.")
 
@@ -91,24 +94,24 @@ else:
 # Write your answers as comments below:
 # ---------------------------------------------------------------------------
 
-# Query 1 (Policy):
-#   Agent selected:
-#   Total LLM calls:
-#   Most expensive call tokens:
-#   Total latency:
-#   Retrieved documents:
+# Query 1 (Policy): What is the overdraft fee?
+#   Agent selected: policy
+#   Total LLM calls: 2
+#   Most expensive call tokens: 231
+#   Total latency: 2.64S
+#   Retrieved documents:account_fees.md 
 
-# Query 2 (Account):
-#   Agent selected:
-#   Total LLM calls:
-#   Most expensive call tokens:
-#   Total latency:
+# Query 2 (Account): What is the balance on ACC-12345?
+#   Agent selected: account_agent
+#   Total LLM calls: 2
+#   Most expensive call tokens: 344
+#   Total latency: 1.72S
 
-# Query 3 (Escalation):
-#   Agent selected:
-#   Total LLM calls:
-#   Most expensive call tokens:
-#   Total latency:
+# Query 3 (Escalation): I need to speak to a manager about fraud on my account!
+#   Agent selected: escalation_agent
+#   Total LLM calls: 2
+#   Most expensive call tokens: 236
+#   Total latency: 2.24S
 
 
 # ---------------------------------------------------------------------------
@@ -127,15 +130,17 @@ print("=" * 60)
 if app is not None:
     error_query = "What is the balance on ACC-99999?"
     print(f"\nQuery: {error_query}")
-    # YOUR CODE HERE — run the query and inspect the trace
-    pass
+    result = ask(app, error_query)
+    print(f"Intent:   {result['intent']}")
+    print(f"Answer:   {result['response'][:200]}")
+    print(f"Sources:  {result['retrieved_sources']}")
 else:
     print("Complete TODO 2 first.")
 
 # Write your findings:
-#   Supervisor routed to:
-#   Error origin in trace:
-#   Error flow:
+#   Supervisor routed to: account_agent
+#   Error origin in trace: account_agent
+#   Error flow: account_agent--> response
 
 
 # ---------------------------------------------------------------------------
@@ -153,6 +158,25 @@ print("=" * 60)
 
 if app is not None:
     # YOUR CODE HERE — run queries with tags
-    pass
+    queries = [
+        "What is the overdraft fee?",
+        "What is the balance on ACC-12345?",
+        "I need to speak to a manager about fraud on my account!",
+    ]
+    for query in queries:
+        print(f"\nQuery: {query}")
+        result = app.invoke(
+                {
+                    "query": query,
+                    "intent": "",
+                    "response": "",
+                    "context": "",
+                    "retrieved_sources": [],
+                },
+                config={"tags": [f"custom-tag-monitoring"]},
+            )
+        print(f"Intent:   {result['intent']}")
+        print(f"Answer:   {result['response'][:200]}")
+        print(f"Sources:  {result['retrieved_sources']}")
 else:
     print("Complete TODO 2 first.")
